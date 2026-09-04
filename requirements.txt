@@ -9,3 +9,4 @@ pygwalker==0.4.8.5
 streamlit==1.35.0
 vizro==0.1.16
 vizro-ai==0.2.0
+rich>=10.14.0,<14
