@@ -1,35 +1,75 @@
-import getpass
 import os
-import sys
 import time
 import sqlite3
+
 import pandas as pd
+import plotly.express as px
 import streamlit as st
-import pygwalker as pyg
-from vizro_ai import VizroAI
-import vizro.plotly.express as px
-from langchain.llms import OpenAI
-from langchain_openai import ChatOpenAI
-from langchain_openai import OpenAIEmbeddings, AzureOpenAIEmbeddings
 from langchain.chains import create_sql_query_chain
-from langchain_community.vectorstores import FAISS
 from langchain_community.utilities import SQLDatabase
-from langchain_community.agent_toolkits import create_sql_agent
-from langchain_community.tools.sql_database.tool import QuerySQLDataBaseTool
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.example_selectors import SemanticSimilarityExampleSelector
 from langchain_core.prompts import ChatPromptTemplate, FewShotPromptTemplate, PromptTemplate
+from langchain_openai import ChatOpenAI
 from pygwalker.api.streamlit import StreamlitRenderer
 
-### Connect SQLite3 Database ###
-db = SQLDatabase.from_uri("sqlite:///Chinook.db")
-conn = sqlite3.connect("Chinook.db")
-cursor = conn.cursor()
-table_info = db.table_info
 
-# @st.cache_data
-def generate_dataframe(question):
-    ### Prompt Strategy ###
+# -----------------------------
+# Page configuration
+# -----------------------------
+st.set_page_config(page_title="InsightAI", layout="wide")
+
+
+# -----------------------------
+# Database connection
+# -----------------------------
+@st.cache_resource
+def get_database():
+    return SQLDatabase.from_uri("sqlite:///Chinook.db")
+
+
+@st.cache_resource
+def get_sqlite_connection():
+    return sqlite3.connect("Chinook.db", check_same_thread=False)
+
+
+db = get_database()
+conn = get_sqlite_connection()
+
+
+# -----------------------------
+# API key configuration
+# -----------------------------
+def get_api_key():
+    # Sidebar input takes priority. Streamlit secrets are a secure fallback.
+    user_key = st.session_state.get("user_api_key_input", "").strip()
+    if user_key:
+        return user_key
+
+    # Support both the old secret name and the standard OpenAI name.
+    if "OPENAI_API_KEY" in st.secrets:
+        return st.secrets["OPENAI_API_KEY"]
+
+    if "openai_api_key" in st.secrets:
+        return st.secrets["openai_api_key"]
+
+    return ""
+
+
+def get_llm(api_key, model, temperature, top_p):
+    base_url = st.secrets.get("selected_base_url", "https://api.openai.com/v1")
+    return ChatOpenAI(
+        api_key=api_key,
+        base_url=base_url,
+        model=model,
+        temperature=temperature,
+        top_p=top_p,
+    )
+
+
+# -----------------------------
+# Data Agent
+# -----------------------------
+def generate_dataframe(question, llm):
     examples = [
         {"input": "List all artists.", "query": "SELECT * FROM Artist;"},
         {
@@ -42,185 +82,300 @@ def generate_dataframe(question):
         },
         {
             "input": "Find the total duration of all tracks.",
-            "query": "SELECT SUM(Milliseconds) FROM Track;",
+            "query": "SELECT SUM(Milliseconds) AS TotalDuration FROM Track;",
         },
         {
             "input": "List all customers from Canada.",
             "query": "SELECT * FROM Customer WHERE Country = 'Canada';",
         },
-        {
-            "input": "How many tracks are there in the album with ID 5?",
-            "query": "SELECT COUNT(*) FROM Track WHERE AlbumId = 5;",
-        },
-        {
-            "input": "Find the total number of invoices.",
-            "query": "SELECT COUNT(*) FROM Invoice;",
-        },
-        {
-            "input": "List all tracks that are longer than 5 minutes.",
-            "query": "SELECT * FROM Track WHERE Milliseconds > 300000;",
-        },
-        {
-            "input": "Who are the top 5 customers by total purchase?",
-            "query": "SELECT CustomerId, SUM(Total) AS TotalPurchase FROM Invoice GROUP BY CustomerId ORDER BY TotalPurchase DESC LIMIT 5;",
-        },
-        {
-            "input": "Which albums are from the year 2000?",
-            "query": "SELECT * FROM Album WHERE strftime('%Y', ReleaseDate) = '2000';",
-        },
-        {
-            "input": "How many employees are there",
-            "query": 'SELECT COUNT(*) FROM "Employee"',
-        },
     ]
 
-    ### Find out the most semantically relevant examples ###
-    # example_selector = SemanticSimilarityExampleSelector.from_examples(
-    #     examples,
-    #     # OpenAIEmbeddings(openai_api_key = openai_api_key, openai_api_base=selected_base_url),
-    #     FAISS,
-    #     k=5,
-    #     input_keys=["input"],
-    # )
-    # example_selector.select_examples({"input": "how many artists are there?"})
+    example_prompt = PromptTemplate.from_template(
+        "User input: {input}\nSQL query: {query}"
+    )
 
-    ### Dynamic Few-shot Strategy ###
-    example_prompt = PromptTemplate.from_template("User input: {input}\nSQL query: {query}")
     few_shot_prompt = FewShotPromptTemplate(
-        examples=examples[:5],
+        examples=examples,
         example_prompt=example_prompt,
-        prefix="You are a SQLite expert. Given an input question, create a syntactically correct SQLite query to run. Unless otherwise specificed, do not return more than {top_k} rows.\n\nHere is the relevant table info: {table_info}\n\nBelow are a number of examples of questions and their corresponding SQL queries.",
-        suffix="User input: {input}\nSQL query: ",
+        prefix=(
+            "You are a SQLite expert. Given an input question, create a syntactically "
+            "correct SQLite query. Unless otherwise specified, do not return more than "
+            "{top_k} rows.\n\nRelevant table information:\n{table_info}\n\n"
+            "Examples:"
+        ),
+        suffix="User input: {input}\nSQL query:",
         input_variables=["input", "top_k", "table_info"],
     )
-    chain = create_sql_query_chain(llm, db, few_shot_prompt)
 
-    ### Query Validation ###
-    system = """Double check the user's {dialect} query for common mistakes, including:
-    - Using NOT IN with NULL values
-    - Using UNION when UNION ALL should have been used
-    - Using BETWEEN for exclusive ranges
-    - Data type mismatch in predicates
-    - Properly quoting identifiers
-    - Using the correct number of arguments for functions
-    - Casting to the correct data type
-    - Using the proper columns for joins
-    
-    If there are any of the above mistakes, rewrite the query.
-    If there are no mistakes, just reproduce the original query without any texting message.
-    
-    Output the final SQL query only."""
+    sql_chain = create_sql_query_chain(llm, db, few_shot_prompt)
 
-    valid_prompt = ChatPromptTemplate.from_messages(
-        [("system", system, ), ("human", "{query}")]
-    ).partial(dialect=db.dialect)
-    validation_chain = valid_prompt | llm | StrOutputParser()
-    full_chain = {"query": chain} | validation_chain
-    final_query = full_chain.invoke({"question": question})
+    validation_system = """You are a SQLite SQL validator.
+Check the SQL query for common mistakes. Return ONLY a valid SQLite SQL query.
+Do not include markdown, explanations, or comments.
+If the query is already correct, return it unchanged."""
 
-    ### Execute the SQL query & insert into dataframe ###
-    cursor.execute(final_query)
-    answer = cursor.fetchall()
+    validation_prompt = ChatPromptTemplate.from_messages(
+        [("system", validation_system), ("human", "{query}")]
+    )
 
-    ### Create a DataFrame from the rows and column names ###
-    column_names = [desc[0] for desc in cursor.description]
-    answer = pd.DataFrame(answer, columns=column_names)
-    st.success('Data is generated successfully!', icon="✅")
-    with st.expander(":bookmark_tabs: Data Result", expanded=True):
-        st.write(answer)
-    st.session_state.df = answer
-def stream_data(code_string):
-    for word in code_string.split(" "):
+    validation_chain = validation_prompt | llm | StrOutputParser()
+
+    try:
+        raw_query = sql_chain.invoke({"question": question})
+        final_query = validation_chain.invoke({"query": raw_query}).strip()
+
+        # Remove accidental markdown fences.
+        final_query = final_query.replace("```sql", "").replace("```", "").strip()
+
+        cursor = conn.cursor()
+        cursor.execute(final_query)
+        rows = cursor.fetchall()
+        columns = [desc[0] for desc in cursor.description]
+
+        answer = pd.DataFrame(rows, columns=columns)
+        st.session_state["df"] = answer
+
+        st.success("Data generated successfully!", icon="✅")
+        with st.expander("📑 Data Result", expanded=True):
+            st.dataframe(answer, use_container_width=True)
+
+        with st.expander("Generated SQL"):
+            st.code(final_query, language="sql")
+
+    except Exception as e:
+        st.error(f"Unable to generate data: {e}")
+
+
+# -----------------------------
+# BI Wizard
+# Replaces the deprecated VizroAI API
+# -----------------------------
+def stream_text(text):
+    for word in text.split():
         yield word + " "
-        time.sleep(0.05)
-def generate_answer(prompt):
-    vizro_ai = VizroAI(model=llm)
-    code_string = vizro_ai._run_plot_tasks(df, prompt, explain=True)
-    code_string = code_string['business_insights']
-    st.write_stream(stream_data(code_string))
-    fig = vizro_ai.plot(df, prompt)
-    st.plotly_chart(fig)
+        time.sleep(0.02)
 
-### Streamlit UI Configuration ###
-st.set_page_config(
-    page_title="Insight AI",
-    layout="wide"
-)
-tab1, tab2, tab3 = st.tabs(["Data Agent", "Visual Analyzer", "BI Wizard"])
 
+def generate_business_insights(df, prompt, llm):
+    summary = df.head(20).to_csv(index=False)
+
+    insight_prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """You are a business intelligence analyst. Analyze the supplied dataset
+and answer the user's request with concise, useful insights. Mention notable trends,
+patterns, comparisons, and caveats when relevant. Do not invent data.""",
+            ),
+            (
+                "human",
+                "User request: {prompt}\n\nDataset sample:\n{data}",
+            ),
+        ]
+    )
+
+    chain = insight_prompt | llm | StrOutputParser()
+    return chain.invoke({"prompt": prompt, "data": summary})
+
+
+def build_chart(df, chart_type, x_col, y_col):
+    if df.empty:
+        return None
+
+    if chart_type == "Bar":
+        return px.bar(df, x=x_col, y=y_col)
+    if chart_type == "Line":
+        return px.line(df, x=x_col, y=y_col)
+    if chart_type == "Scatter":
+        return px.scatter(df, x=x_col, y=y_col)
+    if chart_type == "Pie":
+        return px.pie(df, names=x_col, values=y_col)
+    if chart_type == "Histogram":
+        return px.histogram(df, x=x_col)
+
+    return px.bar(df, x=x_col, y=y_col)
+
+
+# -----------------------------
+# Sidebar
+# -----------------------------
 with st.sidebar:
-    st.title("Insight AI :chains:")
-    ### Connect OpenAI ###
-    user_api_key = st.sidebar.text_input('OpenAI API Key', type='password', placeholder='Open API Key')
-    # selected_base_url = st.sidebar.text_input('Proxy', placeholder='Base URL path for API requests')
-    if user_api_key:
-        openai_api_key = user_api_key
-        selected_base_url = "https://api.openai.com/v1"
+    st.title("InsightAI ✨")
+
+    st.text_input(
+        "OpenAI API Key (optional if configured in Secrets)",
+        type="password",
+        placeholder="sk-...",
+        key="user_api_key_input",
+    )
+
+    api_key = get_api_key()
+
+    if api_key:
+        st.success("API key configured", icon="✅")
     else:
-        st.warning('Please input OpenAI API key!', icon='⚠')
-        openai_api_key = st.secrets["openai_api_key"]
-        selected_base_url = st.secrets["selected_base_url"]
-        # os.environ["OPENAI_API_KEY"] = getpass.getpass()
-    st.subheader('Models and parameters')
-    selected_model = st.sidebar.selectbox('Choose a ChatGPT model', ['gpt-3.5-turbo', 'gpt-4'], key='selected_model')
-    selected_temperature = st.sidebar.slider('Temperature', min_value=0.01, max_value=1.0, value=0.1, step=0.01)
-    selected_top_p = st.sidebar.slider('Top P', min_value=0.01, max_value=1.0, value=0.9, step=0.01)
-    llm = ChatOpenAI(openai_api_key=openai_api_key, base_url=selected_base_url, model=selected_model,
-                     temperature=selected_temperature, top_p=selected_top_p)
-    #####################
-    st.write('© 2026 Aditya Kusale, All Rights Reserved')
-    st.markdown("""---""")
-    st.sidebar.header("About")
-    st.markdown("Transforming natural language into structured data and stunning BI visualizations.")
-    st.markdown("Unlock insights from data effortlessly, streamlining analysis workflow and empowering data-driven decision making.")
-    st.markdown("Experience the future of data exploration today with innovative GenAI tool.")
-    st.markdown("""---""")
+        st.info("Add an API key in Streamlit Secrets or enter one above.")
+
+    st.subheader("Model Settings")
+
+    selected_model = st.selectbox(
+        "Choose a model",
+        ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini"],
+        index=0,
+    )
+    selected_temperature = st.slider(
+        "Temperature", 0.0, 1.0, 0.1, 0.05
+    )
+    selected_top_p = st.slider(
+        "Top P", 0.1, 1.0, 0.9, 0.05
+    )
+
+    st.markdown("---")
+    st.header("About")
+    st.write(
+        "Transforming natural-language questions into structured data analysis "
+        "and interactive visualizations."
+    )
+
+    st.markdown("---")
+    st.caption("InsightAI — Generative AI Data Intelligence Platform")
+
+
+llm = None
+if api_key:
+    try:
+        llm = get_llm(
+            api_key,
+            selected_model,
+            selected_temperature,
+            selected_top_p,
+        )
+    except Exception as e:
+        st.sidebar.error(f"LLM configuration error: {e}")
+
+
+# -----------------------------
+# Main UI
+# -----------------------------
+tab1, tab2, tab3 = st.tabs(
+    ["Data Agent", "Visual Analyzer", "BI Wizard"]
+)
+
 
 with tab1:
-    with st.form('data_agent'):
-        st.markdown("### Data Agent :open_file_folder: ###")
-        question = st.text_area('Enter text:', 'What data you want to extract?')
-        submitted = st.form_submit_button('Submit')
-        if submitted and openai_api_key.startswith('sk-'):
-            generate_dataframe(question)
+    st.markdown("### Data Agent 📂")
+    st.write("Ask questions about the Chinook SQLite database in natural language.")
+
+    with st.form("data_agent"):
+        question = st.text_area(
+            "Enter your question",
+            "Who are the top 5 customers by total purchase?",
+        )
+        submitted = st.form_submit_button("Generate")
+
+    if submitted:
+        if not api_key or llm is None:
+            st.error("Please configure an OpenAI API key first.")
+        elif question.strip():
+            with st.spinner("Generating SQL and querying data..."):
+                generate_dataframe(question, llm)
+
 
 with tab2:
-    st.markdown("### Visual Analyzer :bar_chart: ###")
-    uploaded_file = st.file_uploader("Generate Dataset from Data Agenet or Upload your data by CSV file below", type=['csv'])
-    if 'df' in st.session_state is not None:
-        df = st.session_state.df
-        st.success('Data is imported from Data Agent successfully! Please preview from below.', icon="✅")
-        pyg_app = StreamlitRenderer(df)
-        pyg_app.explorer()
-    elif uploaded_file is not None:
-        df = pd.read_csv(uploaded_file)
-        st.success('Data is uploaded successfully! Please preview from below.', icon="✅")
-        pyg_app = StreamlitRenderer(df)
-        pyg_app.explorer()
-        st.session_state.df2 = df
+    st.markdown("### Visual Analyzer 📊")
+
+    uploaded_file = st.file_uploader(
+        "Upload a CSV file or use data generated by the Data Agent",
+        type=["csv"],
+    )
+
+    df_for_visualization = None
+
+    if "df" in st.session_state and st.session_state["df"] is not None:
+        df_for_visualization = st.session_state["df"]
+        st.success("Using dataset generated by Data Agent.", icon="✅")
+
+    if uploaded_file is not None:
+        try:
+            df_for_visualization = pd.read_csv(uploaded_file)
+            st.session_state["df2"] = df_for_visualization
+            st.success("CSV uploaded successfully!", icon="✅")
+        except Exception as e:
+            st.error(f"Unable to read CSV: {e}")
+
+    if df_for_visualization is not None:
+        st.dataframe(df_for_visualization.head(20), use_container_width=True)
+
+        try:
+            pyg_app = StreamlitRenderer(df_for_visualization)
+            pyg_app.explorer()
+        except Exception as e:
+            st.warning(
+                "PygWalker could not start. Basic visualization is still available."
+            )
+            st.caption(str(e))
+
+        st.subheader("Quick Chart")
+        columns = df_for_visualization.columns.tolist()
+
+        if columns:
+            x_col = st.selectbox("X-axis", columns, key="quick_x")
+            numeric_cols = df_for_visualization.select_dtypes(
+                include="number"
+            ).columns.tolist()
+            y_options = numeric_cols if numeric_cols else columns
+            y_col = st.selectbox("Y-axis", y_options, key="quick_y")
+            chart_type = st.selectbox(
+                "Chart type",
+                ["Bar", "Line", "Scatter", "Histogram", "Pie"],
+                key="quick_chart",
+            )
+
+            try:
+                fig = build_chart(
+                    df_for_visualization,
+                    chart_type,
+                    x_col,
+                    y_col,
+                )
+                if fig:
+                    st.plotly_chart(fig, use_container_width=True)
+            except Exception as e:
+                st.error(f"Unable to create chart: {e}")
+
 
 with tab3:
-    with st.form('bi_wizard'):
-        st.markdown("### BI Wizard :crystal_ball: ###")
-        prompt = st.text_area('Enter text:', 'What diagram you want to generate?')
-        generated = st.form_submit_button('Generate')
+    st.markdown("### BI Wizard 🔮")
 
-        if 'df' in st.session_state is not None:
-            df = st.session_state.df
-            st.success('Data is imported from Data Agent successfully! Please preview from below.', icon="✅")
-            with st.expander (":mag: Dataframe Preview (10 rows)"):
-              st.write(df.head(10))
-        elif 'df2' in st.session_state is not None:
-            df = st.session_state.df2
-            st.success('Data is uploaded successfully! Please preview from below.', icon="✅")
-            with st.expander(":mag: Dataframe Preview (10 rows)"):
-             st.write(df.head(10))
-        else:
-            st.warning("No dataset from Data Agent or upload file.", icon='⚠')
+    if "df" in st.session_state:
+        df = st.session_state["df"]
+    elif "df2" in st.session_state:
+        df = st.session_state["df2"]
+    else:
+        df = None
 
-        if generated and openai_api_key.startswith('sk-'):
-            if prompt:
-                with st.spinner('Wait for it...'):
-                    generate_answer(prompt)
-            else:
-                st.warning("Please enter a prompt.", icon='⚠')
+    if df is None:
+        st.warning(
+            "Generate data in Data Agent or upload a CSV in Visual Analyzer first.",
+            icon="⚠️",
+        )
+    else:
+        with st.expander("🔎 Dataset Preview"):
+            st.dataframe(df.head(10), use_container_width=True)
+
+        prompt = st.text_area(
+            "What insights or visualization would you like?",
+            "Summarize the most important trends in this dataset.",
+        )
+
+        if st.button("Generate BI Insights"):
+            if not api_key or llm is None:
+                st.error("Please configure an OpenAI API key first.")
+            elif prompt.strip():
+                with st.spinner("Generating insights..."):
+                    try:
+                        insights = generate_business_insights(df, prompt, llm)
+                        st.subheader("Business Insights")
+                        st.write_stream(stream_text(insights))
+                    except Exception as e:
+                        st.error(f"Unable to generate insights: {e}")
