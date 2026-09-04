@@ -168,7 +168,7 @@ with st.sidebar:
     llm = ChatOpenAI(openai_api_key=openai_api_key, base_url=selected_base_url, model=selected_model,
                      temperature=selected_temperature, top_p=selected_top_p)
     #####################
-    st.write('© 2024 Micky Wong, All Rights Reserved')
+    st.write('© 2026 Aditya Kusale, All Rights Reserved')
     st.markdown("""---""")
     st.sidebar.header("About")
     st.markdown("Transforming natural language into structured data and stunning BI visualizations.")
