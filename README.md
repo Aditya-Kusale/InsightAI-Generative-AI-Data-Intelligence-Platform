@@ -11,23 +11,18 @@ The platform combines Retrieval-Augmented Generation (RAG), Text-to-SQL, Generat
 ## Core Capabilities
 
 ### RAG-Based Text-to-SQL
-
 Uses retrieval and contextual examples to improve natural-language-to-SQL generation.
 
 ### Generative Business Intelligence
-
 Converts data queries into meaningful business insights and analytical outputs.
 
 ### Visual Analytics
-
 Supports data exploration and visualization generation through the Visual Analyzer and BI Wizard.
 
 ### Dynamic Few-Shot Prompting
-
 Incorporates relevant examples to improve LLM response quality for analytical tasks.
 
 ### Multi-Agent Validation
-
 Uses specialized LLM agents to validate generated outputs and support iterative self-correction.
 
 ## Architecture
