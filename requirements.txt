@@ -9,3 +9,5 @@ pygwalker
 streamlit
 vizro
 vizro-ai
+faiss-cpu
+openai
