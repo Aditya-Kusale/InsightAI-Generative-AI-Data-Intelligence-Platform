@@ -1,176 +1,266 @@
-# InsightAI — Generative AI Data Intelligence Platform
+# InsightAI ✨
 
-Transform natural-language questions into structured data analysis, SQL queries, visualizations, and actionable business insights.
+### Generative AI Data Intelligence Platform
 
-## About the Project
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://insightai-generative-ai-data-intelligence-platform.streamlit.app/)
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![OpenAI](https://img.shields.io/badge/OpenAI-API-412991?style=for-the-badge&logo=openai&logoColor=white)](https://platform.openai.com/)
+[![GitHub](https://img.shields.io/badge/GitHub-Repository-181717?style=for-the-badge&logo=github)](https://github.com/Aditya-Kusale/InsightAI)
 
-InsightAI is an AI-powered data intelligence platform that leverages Large Language Models (LLMs) to make data exploration more intuitive and accessible. Users can interact with data using natural language and generate structured analyses, SQL queries, visualizations, and business insights.
+> An AI-powered data intelligence platform that enables users to interact with databases using natural language, generate SQL queries, explore data visually, and derive business insights through interactive AI-assisted workflows.
 
-The platform combines Retrieval-Augmented Generation (RAG), Text-to-SQL, Generative Business Intelligence, and multi-agent validation to support more reliable data-driven decision-making.
+## 🚀 Live Demo
 
-## Core Capabilities
+**Try InsightAI here:**  
+👉 **https://insightai-generative-ai-data-intelligence-platform.streamlit.app/**
 
-### RAG-Based Text-to-SQL
-Uses retrieval and contextual examples to improve natural-language-to-SQL generation.
+---
 
-### Generative Business Intelligence
-Converts data queries into meaningful business insights and analytical outputs.
+## 📌 Overview
 
-### Visual Analytics
-Supports data exploration and visualization generation through the Visual Analyzer and BI Wizard.
+InsightAI bridges the gap between business questions and data analysis. Instead of requiring users to manually write SQL queries or build dashboards, the platform provides an intuitive natural-language interface for exploring and understanding data.
 
-### Dynamic Few-Shot Prompting
-Incorporates relevant examples to improve LLM response quality for analytical tasks.
+The application combines Large Language Models (LLMs), LangChain, SQL databases, interactive visualizations, and AI-powered analytics into a unified Streamlit application.
 
-### Multi-Agent Validation
-Uses specialized LLM agents to validate generated outputs and support iterative self-correction.
+---
 
-## Architecture
+## ✨ Key Features
+
+### 🤖 Data Agent
+Ask questions about the connected SQLite database in natural language.
+
+- Natural language to SQL generation
+- AI-assisted database querying
+- Automated query execution
+- Structured tabular results
+- Configurable LLM settings
+
+### 📊 Visual Analyzer
+Upload and explore CSV datasets interactively.
+
+- CSV file upload
+- Interactive data exploration
+- Automated visual analysis
+- Dynamic charts and insights
+- Low-code analytics experience powered by PygWalker
+
+### 🔮 BI Wizard
+Generate business intelligence insights from available data.
+
+- AI-assisted business analysis
+- Data-driven insight generation
+- Interactive analytics workflow
+- Integrated visualization capabilities
+
+### ⚙️ Configurable AI Settings
+
+- Model selection
+- Temperature control
+- Top-P configuration
+- Secure API key handling through Streamlit Secrets
+- Optional sidebar API key input
+
+---
+
+## 📸 Application Screenshots
+
+### Data Agent
+Ask questions about the Chinook SQLite database using natural language.
+
+![Data Agent](assets/data-agent.png)
+
+### Visual Analyzer
+Upload CSV files and explore datasets interactively.
+
+![Visual Analyzer](assets/visual-analyzer.png)
+
+### BI Wizard
+Generate AI-assisted business intelligence insights.
+
+![BI Wizard](assets/bi-wizard.png)
+
+---
+
+## 🏗️ Architecture
 
 ```text
-User Query
-    │
-    ▼
-LLM Understanding Layer
-    │
-    ▼
-RAG + Dynamic Few-Shot Retrieval
-    │
-    ▼
-Text-to-SQL Generation
-    │
-    ▼
-Query / Output Validation
-    │
-    ├───────────────┐
-    ▼               ▼
-Data Agent    Visual Analyzer
-    │               │
-    └───────┬───────┘
-            ▼
-        BI Wizard
-            │
-            ▼
- Multi-Agent Validation
-            │
-            ▼
-Insights & Visualizations
+                    ┌─────────────────────┐
+                    │       User          │
+                    └──────────┬──────────┘
+                               │
+                               ▼
+                    ┌─────────────────────┐
+                    │   Streamlit UI      │
+                    └──────────┬──────────┘
+                               │
+              ┌────────────────┼────────────────┐
+              │                │                │
+              ▼                ▼                ▼
+       ┌────────────┐   ┌──────────────┐  ┌────────────┐
+       │ Data Agent │   │Visual Analyzer│  │ BI Wizard  │
+       └─────┬──────┘   └──────┬───────┘  └─────┬──────┘
+             │                 │                │
+             ▼                 ▼                ▼
+        LangChain          PygWalker        Vizro AI
+             │                 │                │
+             ▼                 ▼                │
+        OpenAI API       Interactive Charts     │
+             │                                  │
+             ▼                                  ▼
+        SQLite Database              AI-Generated Insights
 ```
 
-## Tech Stack
+---
 
-- Python
-- Streamlit
-- OpenAI API / LLMs
-- SQLite
-- Pandas
-- Plotly
-- Retrieval-Augmented Generation (RAG)
-- Text-to-SQL
-- Generative AI
-- Multi-Agent Systems
+## 🛠️ Tech Stack
 
-## Getting Started
+| Category | Technologies |
+|---|---|
+| Frontend | Streamlit |
+| Language | Python |
+| LLM Framework | LangChain |
+| AI Model | OpenAI API |
+| Database | SQLite |
+| Data Processing | Pandas |
+| Visualization | Plotly |
+| Interactive Analytics | PygWalker |
+| Business Intelligence | Vizro AI |
+| Deployment | Streamlit Community Cloud |
 
-### Prerequisites
+---
 
-- Python 3.x
-- An OpenAI-compatible API key
+## 📂 Project Structure
 
-### Installation
+```text
+InsightAI/
+│
+├── insight_ai.py              # Main Streamlit application
+├── requirements.txt           # Project dependencies
+├── Chinook.db                 # Sample SQLite database
+├── Chinook_Sqlite.sql         # Database schema
+├── README.md                  # Project documentation
+├── LICENSE                    # License information
+└── assets/                    # Application screenshots
+    ├── data-agent.png
+    ├── visual-analyzer.png
+    └── bi-wizard.png
+```
 
-1. Clone the repository:
+---
+
+## ⚡ Getting Started
+
+### 1. Clone the repository
 
 ```bash
 git clone https://github.com/Aditya-Kusale/InsightAI.git
-```
-
-2. Navigate to the project directory:
-
-```bash
 cd InsightAI
 ```
 
-3. Install dependencies:
+### 2. Create a virtual environment
+
+```bash
+python -m venv venv
+```
+
+Activate it:
+
+**Windows**
+
+```bash
+venv\Scripts\activate
+```
+
+**macOS/Linux**
+
+```bash
+source venv/bin/activate
+```
+
+### 3. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-4. Provide your API key through Streamlit secrets or the application's sidebar.
+### 4. Configure API Key
 
-5. Run the application:
+Create Streamlit secrets locally:
+
+```text
+.streamlit/secrets.toml
+```
+
+Add:
+
+```toml
+openai_api_key = "your_openai_api_key"
+selected_base_url = "https://api.openai.com/v1"
+```
+
+> ⚠️ Never commit API keys or `secrets.toml` to GitHub.
+
+### 5. Run the application
 
 ```bash
 streamlit run insight_ai.py
 ```
 
-## Usage
+---
 
-### Data Agent
+## 🔐 API Key Configuration
 
-1. Enter a natural-language question about the available data.
-2. Submit the query.
-3. The Data Agent generates an analytical result or dataset relevant to the question.
-4. The output can be passed to the Visual Analyzer or BI Wizard for further exploration.
+InsightAI supports secure API key configuration through:
 
-### Visual Analyzer
+1. **Streamlit Secrets** — recommended for deployment
+2. **Sidebar API key input** — optional runtime configuration
 
-1. Upload a CSV file when a dataset is not already available from the Data Agent.
-2. Explore data quality and structure.
-3. Perform data cleaning and discovery.
-4. Build visualizations and dashboards.
+The application is designed to avoid crashing when a secret is unavailable and provides a fallback mechanism for user-provided credentials.
 
-### BI Wizard
+---
 
-1. Enter a prompt describing the visualization you want to create.
-2. Generate the visualization.
-3. Review the generated chart together with its textual explanation.
+## 🎯 Use Cases
 
-## Roadmap
+InsightAI can be useful for:
+
+- Business data exploration
+- Natural language database querying
+- Rapid SQL analysis
+- Exploratory data analysis
+- Interactive dashboard creation
+- AI-assisted business intelligence
+- Data analytics experimentation
+
+---
+
+## 🔮 Future Improvements
 
 - [ ] Support additional LLM providers
-- [ ] Support additional SQL databases
-- [ ] Authentication and authorization
-- [ ] Dynamic database connections
-- [ ] Persistent dashboard directory
-- [ ] Advanced RAG strategies
-- [ ] Fine-tuning and evaluation experiments
+- [ ] Multi-database connectivity
+- [ ] Conversation history
+- [ ] Exportable reports
+- [ ] Role-based authentication
+- [ ] Enhanced dashboard generation
+- [ ] Support for additional file formats
+- [ ] Advanced AI-powered anomaly detection
 
-See the [open issues](https://github.com/Aditya-Kusale/InsightAI/issues) for proposed improvements and known issues.
+---
 
-## Contributing
-
-Contributions, suggestions, and improvements are welcome.
-
-1. Fork the repository.
-2. Create a feature branch:
-
-```bash
-git checkout -b feature/AmazingFeature
-```
-
-3. Commit your changes:
-
-```bash
-git commit -m "Add some AmazingFeature"
-```
-
-4. Push the branch:
-
-```bash
-git push origin feature/AmazingFeature
-```
-
-5. Open a Pull Request.
-
-## License
-
-This project is distributed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
-## Contact
+## 👨‍💻 Author
 
 **Aditya Kusale**
 
-- LinkedIn: https://www.linkedin.com/in/aditya-kusale/
 - GitHub: https://github.com/Aditya-Kusale
+- LinkedIn: https://www.linkedin.com/in/aditya-kusale/
+
+---
+
+## ⭐ Show Your Support
+
+If you found this project interesting, consider giving the repository a **star ⭐**.
+
+---
+
+<p align="center">
+  Built with Python, AI, and curiosity ✨
+</p>
