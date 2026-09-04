@@ -239,6 +239,7 @@ with st.sidebar:
 
     st.markdown("---")
     st.caption("InsightAI — Generative AI Data Intelligence Platform")
+    st.write("© 2026 Aditya Kusale, All Rights Reserved")
 
 
 llm = None
