@@ -5,7 +5,7 @@ langchain-openai==0.1.7
 langchain-text-splitters==0.2.0
 pandas==1.5.3
 plotly==5.22.0
-pygwalker==0.4.8.5
+pygwalker
 streamlit==1.35.0
 vizro==0.1.16
 vizro-ai==0.2.0
